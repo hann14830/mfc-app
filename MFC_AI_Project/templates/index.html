@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>갯벌 지기</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 550px; background-color: #ffffff; border-radius: 15px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        
+        /* 앱 제목 및 부제목 스타일 */
+        h2 { text-align: center; font-size: 26px; color: #2c3e50; margin-bottom: 5px; margin-top: 0; font-weight: 900; letter-spacing: -0.5px; }
+        .subtitle { text-align: center; font-size: 13px; color: #7f8c8d; margin-top: 0; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #27ae60; word-break: keep-all; }
+        
+        .card { background-color: #fcfcfc; border: 1px solid #eef2f5; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+        .card-title { font-size: 16px; font-weight: bold; color: #27ae60; margin-bottom: 15px; display: block; }
+        
+        .control-group { display: flex; gap: 10px; margin-bottom: 12px; }
+        select, input, button { padding: 12px; border-radius: 8px; border: 1px solid #dce4ec; font-size: 14px; outline: none; }
+        select { width: 100%; background-color: #fff; color: #333; }
+        
+        .sim-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .sim-row input { width: 90px; text-align: center; flex-shrink: 0; }
+        .sim-row span { white-space: nowrap; font-size: 14px; font-weight: bold; color: #555; flex-shrink: 0; }
+        .sim-row button { flex: 1; white-space: nowrap; }
+
+        .btn-primary { background-color: #2980b9; color: #fff; font-weight: bold; cursor: pointer; border: none; width: 100px; flex-shrink: 0; }
+        .btn-primary:hover { background-color: #2471a3; }
+        .btn-success { background-color: #27ae60; color: #fff; font-weight: bold; cursor: pointer; border: none; }
+        .btn-success:hover { background-color: #219150; }
+
+        .result-box { display: none; margin-top: 15px; background-color: #e8f8f5; padding: 18px; border-radius: 10px; border-left: 5px solid #1abc9c; font-size: 15px; line-height: 1.6; color: #2c3e50; }
+        .highlight { color: #16a085; font-weight: bold; font-size: 20px; }
+        .insight-box { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #b2ebf2; font-size: 13px; color: #555; }
+        .insight-badge { display: inline-block; background-color: #1abc9c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <h2>🦀 갯벌 지기</h2>
+    <p class="subtitle">갯벌 연료전지 측정 데이터 시각화 및 AI 발전량 예측 시스템</p>
+
+    <!-- 1. 측정 데이터 확인 -->
+    <div class="card">
+        <span class="card-title">📊 측정 데이터 확인</span>
+        <div class="control-group">
+            <select id="currentStatus">
+                <option value="물">물 첨가</option>
+                <option value="염화나트륨">염화나트륨 첨가</option>
+                <option value="황새기젓">황새기젓 첨가</option>
+                <option value="드라이아이스">드라이아이스 첨가 (혐기성)</option>
+                <option value="갯벌배양액" selected>갯벌 세균 배양액 첨가</option>
+                <option value="황새기젓배양액">황새기젓 배양액 첨가</option>
+            </select>
+            <button class="btn-primary" onclick="updateDashboard()">조회</button>
+        </div>
+        <canvas id="monitorChart"></canvas>
+    </div>
+
+    <!-- 2. AI 발전량 예측 -->
+    <div class="card">
+        <span class="card-title">🤖 AI 발전량 예측</span>
+        <div class="control-group">
+            <select id="simCondition">
+                <option value="물">물 첨가</option>
+                <option value="염화나트륨">염화나트륨 첨가</option>
+                <option value="황새기젓">황새기젓 첨가</option>
+                <option value="드라이아이스">드라이아이스 첨가 (혐기성)</option>
+                <option value="갯벌배양액" selected>갯벌 세균 배양액 첨가</option>
+                <option value="황새기젓배양액">황새기젓 배양액 첨가</option>
+            </select>
+        </div>
+        <div class="sim-row">
+            <input type="number" id="simTime" placeholder="예: 30" min="1">
+            <span>분 경과</span>
+            <button class="btn-success" onclick="runSimulation()">예측하기</button>
+        </div>
+        
+        <!-- 분석 결과창 -->
+        <div id="simResult" class="result-box"></div>
+    </div>
+</div>
+
+<script>
+    const sensorData = {
+        '물': [147, 176, 210, 232, 254, 285, 301, 303, 325, 333],
+        '염화나트륨': [25, 28, 120, 173, 287, 374, 408, 437, 465, 505],
+        '갯벌배양액': [155, 224, 286, 327, 361, 393, 435, 468, 503, 535],
+        '황새기젓배양액': [135, 181, 213, 243, 271, 292, 311, 327, 348, 365],
+        '황새기젓': [140, 180, 220, 260, 295, 325, 355, 385, 405, 423],
+        '드라이아이스': [130, 160, 195, 240, 280, 315, 345, 375, 400, 417]
+    };
+
+    const timeLabels = ['1분', '2분', '3분', '4분', '5분', '6분', '7분', '8분', '9분', '10분'];
+    let chartInstance;
+
+    function initDashboard() {
+        const ctx = document.getElementById('monitorChart').getContext('2d');
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [{
+                    label: '발전 전압 (mV)',
+                    data: sensorData['갯벌배양액'],
+                    borderColor: '#27ae60',
+                    backgroundColor: 'rgba(39, 174, 96, 0.15)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#27ae60',
+                    pointRadius: 4,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { grid: { color: '#f0f0f0' } },
+                    y: { grid: { color: '#f0f0f0' }, beginAtZero: true, max: 600 }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    function updateDashboard() {
+        const selected = document.getElementById('currentStatus').value;
+        chartInstance.data.datasets[0].data = sensorData[selected];
+        chartInstance.update();
+    }
+
+    // (기존 runSimulation 함수를 통째로 지우고 아래로 교체!)
+    function runSimulation() {
+        const cond = document.getElementById('simCondition').value;
+        const t = document.getElementById('simTime').value;
+        
+        if(!t) {
+            alert('시간(분)을 입력해주세요.');
+            return;
+        }
+
+        const res = document.getElementById('simResult');
+        res.style.display = 'block';
+        res.innerHTML = `<b>${cond}</b> 조건에서 <b>${t}분</b> 경과 시 <br>AI가 전압을 계산하고 있습니다... ⏳`;
+
+        // 파이썬(Flask) 서버로 조건과 시간을 보내서 계산을 요청(fetch)합니다.
+        fetch('/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ condition: cond, time: t })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // 파이썬이 계산해준 결과(data.voltage)를 화면에 찍어줍니다.
+            res.innerHTML = `
+                <b>${cond}</b> 조건에서 <b>${t}분</b> 경과 시 <br>
+                예상 발전량은 <span class="highlight">${data.voltage} mV</span> 입니다.<br>
+                
+                <div class="insight-box">
+                    <div class="insight-badge">분석 현황</div><br>
+                    ✅ AI 모델 정상 연동 완료. 데이터 최적화 기반 예측치입니다.
+                </div>
+            `;
+        })
+        .catch(error => {
+            res.innerHTML = "서버 연결에 실패했습니다. 파이썬 서버가 켜져 있는지 확인해 주세요.";
+        });
+    }
+
+    window.onload = initDashboard;
+</script>
+
+</body>
+</html>
